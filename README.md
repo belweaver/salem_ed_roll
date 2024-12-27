@@ -32,8 +32,8 @@ Windows :
 - N'oubliez pas d'indiquer le dé de karma dans la liste déroulante
 
 ## Limitations actuelles:
-- pas de jet de dommage
-- pas de compétences
+- pas de jet de dommages
+- les compétences ne sont pas lues
 
 ## Roadmap :
 - lire les compétences
