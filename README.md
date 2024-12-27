@@ -3,17 +3,17 @@ Lancer les dés Earthdawn à partir de la feuille Excel de Salem
 
 ## Logiciel simple qui vous permet de :
 - ouvrir un fichier Excel
-- trouver des compétences dans les feuilles du fichier Excel
+- trouver des talents dans les feuilles du fichier Excel
   - feuilles parcourues:
     - D1
     - D2
     - D3
     - CH
     - Passions+autres
-- ajouter des boutons rapides pour lancer les compétences essentielles (celles avec une valeur dans la colonne "Classification")
-- ajouter un champ de saisie semi-automatique avec toutes les compétences trouvées dans le fichier Excel
-- lancer des dés avec le mécanisme "explosion"
-- vous demander si vous souhaitez ajouter un dé de karma (pour les compétences qui le permettent)
+- ajouter des boutons rapides pour lancer les talents essentielles (celles avec une valeur dans la colonne "Classification")
+- ajouter un champ de saisie semi-automatique avec toutes les talents trouvés dans le fichier Excel
+- lancer des dés avec le mécanisme "d'explosion"
+- demander si vous souhaitez ajouter un dé de karma (pour les talents qui le permettent) par une fenêtre popup
 - afficher l'historique des 50 derniers lancers
 
 ## Utilisation :
