@@ -8,3 +8,5 @@ Simple software that let you :
 - add an autocomplete field with all the skills found in the Excel file
 - roll dice with the "explosion" mechanism
 - ask you if you want to add a karma dice (for skill that allow it)
+
+Usage: python roll.py
