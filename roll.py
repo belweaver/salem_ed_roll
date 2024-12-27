@@ -18,7 +18,7 @@ EXCEL_ZONES = {
 }
 
 REQUIRED_COLUMNS = ['Talents', 'Niv. Tot.', 'Dés', 'Classification']
-DEFAULT_KARMA_DIE = 'D8'
+DEFAULT_KARMA_DIE = 'D12'
 MAX_HISTORY_SIZE = 50
 
 class ToolTip:
@@ -153,7 +153,7 @@ class Config:
             'default_karma_die': DEFAULT_KARMA_DIE,
             'max_history_size': MAX_HISTORY_SIZE,
             'ui_theme': 'default',
-            'window_size': '600x600'
+            'window_size': '600x800'
         }
 
 class DiceRollerApp:
@@ -506,7 +506,7 @@ class DiceRollerApp:
             })
         
             # Ajouter l'entrée dans le Treeview
-            self.history_tree.insert('', 'end', values=(
+            self.history_tree.insert('', 0, values=(
                 talent,
                 str(result),
                 details,
