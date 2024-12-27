@@ -11,3 +11,4 @@ Simple software that let you :
 - show history of last 50 rolls
 
 Usage: python roll.py
+(Windows : dist/roll.exe)
