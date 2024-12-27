@@ -3,3 +3,6 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+build/
+.salem_ed_roll/
+roll.spec
