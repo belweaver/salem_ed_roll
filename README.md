@@ -1,14 +1,32 @@
 # salem_ed_roll
-Roll Earthdawn dice from Salem Excel sheet
+Lancer les dés Earthdawn à partir de la feuille Excel de Salem
 
-Simple software that let you :
-- open an Excel file
-- find skills in all sheets of the Excel file
-- add quick buttons to roll essentials skills (those with a value in the "Classification" column)
-- add an autocomplete field with all the skills found in the Excel file
-- roll dice with the "explosion" mechanism
-- ask you if you want to add a karma dice (for skill that allow it)
-- show history of last 50 rolls
+Logiciel simple qui vous permet de :
+- ouvrir un fichier Excel
+- trouver des compétences dans toutes les feuilles du fichier Excel
+- ajouter des boutons rapides pour lancer les compétences essentielles (celles avec une valeur dans la colonne "Classification")
+- ajouter un champ de saisie semi-automatique avec toutes les compétences trouvées dans le fichier Excel
+- lancer des dés avec le mécanisme "explosion"
+- vous demander si vous souhaitez ajouter un dé de karma (pour les compétences qui le permettent)
+- afficher l'historique des 50 derniers lancers
 
-Usage: python roll.py
-(Windows : dist/roll.exe)
+Utilisation : 
+python roll.py
+(Windows : télécharger dist/roll.exe et le lancer)
+
+Documentation :
+- Dans le fichier Excel (le fiche de personnage), le chiffre indiqué dans la colonne "Classification" correspond à la colonne de boutons rapides créés automatiquement dans l'application
+- Les Compétences ne sont pas lues, seulement dans les talents
+- Si la fiche indique plusieurs fois le même talent, le talent de discipline sont utilisé. S'il y a plusieurs talents possibles amlgré tout, celui qui a le plus haut niveau total est utilisé 
+- N'oubliez pas d'indiquer le dé de karma dans la liste déroulante
+
+Limitations actuelles:
+- pas de jet de dommage
+- pas de compétences
+
+Roadmap :
+- lire les compétences
+- lire le dé de karma dans la fiche
+- coloriser les jets de dé (vert en cas d'explosition et rouge en cas de valeur minimale)
+- possibilité de définir et enregistrer des boutons personnalisés de jet de dé (typiquement pour les jets de dommages, impossible de gérer toutes les possibilités envisageables avec les règles)
+- compteurs essentiels (points de karma, de points de vie...)
