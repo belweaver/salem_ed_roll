@@ -4,294 +4,739 @@ from tkinter import filedialog, messagebox
 import pandas as pd
 import re
 import random
+import json
+from typing import Dict, List, Tuple, Optional, Any
+
+# Constants
+EXCEL_ZONES = {
+    "Comp": [(4, 20), (35, 43), (52, 55)],
+    "D1": [(5, 49)],
+    "D2": [(5, 49)],
+    "D3": [(5, 49)],
+    "CH": [(5, 48)],
+    "Passions+autres": [(4, 46), (82, 85), (90, 105), (106, 112)]
+}
+
+REQUIRED_COLUMNS = ['Talents', 'Niv. Tot.', 'Dés', 'Classification']
+DEFAULT_KARMA_DIE = 'D8'
+MAX_HISTORY_SIZE = 50
+
+class ToolTip:
+    def __init__(self, widget: tk.Widget, text: str):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event=None):
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        self.tooltip = tk.Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+
+        label = tk.Label(self.tooltip, text=self.text, 
+                      justify=tk.LEFT, background="#ffffe0", 
+                      relief=tk.SOLID, borderwidth=1)
+        label.pack()
+
+    def hide_tooltip(self, event=None):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
 
 class AutocompleteCombobox(ttk.Combobox):
-    def set_completion_list(self, completion_list):
-        """Use our completion list as our drop down selection menu, arrows move through menu."""
-        self._completion_list = sorted(completion_list, key=str.lower)  # Work with a sorted list
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._completion_list = []
         self._hits = []
         self._hit_index = 0
         self.position = 0
         self.bind('<KeyRelease>', self.handle_keyrelease)
-        self['values'] = self._completion_list  # Setup our popup menu
 
-    def autocomplete(self, delta=0):
-        """autocomplete the Combobox, delta may be 0/1/-1 to cycle through possible hits"""
-        if delta:  # need to delete selection otherwise we would fix the current position
+    def set_completion_list(self, completion_list: List[str]):
+        self._completion_list = sorted(completion_list, key=str.lower)
+        self._hits = []
+        self._hit_index = 0
+        self.position = 0
+        self['values'] = self._completion_list
+
+    def autocomplete(self, delta: int = 0):
+        if delta:
             self.delete(self.position, tk.END)
-        else:  # set position to end so selection starts where textentry ended
+        else:
             self.position = len(self.get())
-        # collect hits
+
         _hits = []
         for element in self._completion_list:
-            if element.lower().startswith(self.get().lower()):  # Match case insensitively
+            if element.lower().startswith(self.get().lower()):
                 _hits.append(element)
-        # if we have a new hit list, keep this in mind
+
         if _hits != self._hits:
             self._hit_index = 0
             self._hits = _hits
-        # only allow cycling if we are in a known hit list
+
         if _hits == self._hits and self._hits:
             self._hit_index = (self._hit_index + delta) % len(self._hits)
-        # now finally perform the auto completion
+
         if self._hits:
             self.delete(0, tk.END)
             self.insert(0, self._hits[self._hit_index])
             self.select_range(self.position, tk.END)
 
     def handle_keyrelease(self, event):
-        """event handler for the keyrelease event on this widget"""
         if event.keysym == "BackSpace":
             self.delete(self.index(tk.INSERT), tk.END)
             self.position = self.index(tk.END)
-        if event.keysym == "Left":
-            if self.position < self.index(tk.END):  # delete the selection
+        elif event.keysym == "Left":
+            if self.position < self.index(tk.END):
                 self.delete(self.position, tk.END)
             else:
-                self.position = self.position - 1  # delete one character
+                self.position = self.position - 1
                 self.delete(self.position, tk.END)
-        if event.keysym == "Right":
-            self.position = self.index(tk.END)  # go to end (no selection)
-        if len(event.keysym) == 1:
+        elif event.keysym == "Right":
+            self.position = self.index(tk.END)
+        elif len(event.keysym) == 1:
             self.autocomplete()
-        # No need for up/down, we'll jump to the popup
-        # list at the position of the autocompletion
 
-# Fonction pour ouvrir un fichier excel et construire le cache de compétences
-def load_excel_file():
-    # Ouvrir un dialogue de fichier pour sélectionner le fichier excel
-    file_path = filedialog.askopenfilename(filetypes=(("Excel files", "*.xlsx *.xls *.xlsm"), ("All files", "*.*")))
-    if not file_path:
-        return
+class TalentCache:
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, Any]] = {}
 
-    # Initialiser le cache des talents
-    global talent_cache
-    talent_cache = {}
+    def add_talent(self, talent: str, niv_tot: float, des: str, 
+                  karma: bool, classification: float) -> bool:
+        if talent in self._cache:
+            if niv_tot <= self._cache[talent]['niv_tot']:
+                return False
+        self._cache[talent] = {
+            'niv_tot': niv_tot,
+            'des': des,
+            'karma': karma,
+            'classification': classification
+        }
+        return True
 
-    # Lire toutes les feuilles du fichier excel
-    xls = pd.ExcelFile(file_path)
+    def get_talent(self, talent: str) -> Optional[Dict[str, Any]]:
+        return self._cache.get(talent)
 
-    # Zones des talents pour chaque feuille
-    zones = {
-        "Comp": [(4, 20), (35, 43), (52, 55)],
-        "D1": [(5, 49)],
-        "D2": [(5, 49)],
-        "D3": [(5, 49)],
-        "CH": [(5, 48)],
-        "Passions+autres": [(4, 46), (82, 85), (90, 105), (106, 112)]
-    }
+    def get_all_talents(self) -> List[str]:
+        return sorted(self._cache.keys())
 
-    # Parcourir chaque feuille et charger les talents
-    for sheet_name in xls.sheet_names:
-        if sheet_name in zones:
-            for zone in zones[sheet_name]:
-                start, end = zone
-                df = pd.read_excel(xls, sheet_name, skiprows=start-1, nrows=end-start+1, usecols="B:Q")
+    def get_classified_talents(self) -> List[Tuple[str, float]]:
+        return [(talent, data['classification']) 
+                for talent, data in self._cache.items() 
+                if isinstance(data['classification'], (int, float)) 
+                and data['classification'] > 0]
 
-                # Nettoyer les noms de colonnes si ce sont des chaînes de caractères
-                df.columns = [col.strip() if isinstance(col, str) else col for col in df.columns]
+class Config:
+    def __init__(self, filename: str = 'dice_roller_config.json'):
+        self.filename = filename
+        self.data = self.load()
 
-                # Vérifier si les colonnes nécessaires existent
-                if 'Talents' in df.columns and 'Niv. Tot.' in df.columns and 'Dés' in df.columns and 'Classification' in df.columns:
-                    for index, row in df.iterrows():
-                        talent = row['Talents']
-                        niv_tot = row['Niv. Tot.']
-                        des = row['Dés']
-                        classification = row['Classification']
+    def load(self) -> Dict[str, Any]:
+        try:
+            with open(self.filename, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return self.get_default_config()
 
-                        # Filtrer les talents qui n'ont pas de valeur numérique dans la colonne Niv. Tot.
-                        if pd.notna(talent) and pd.notna(niv_tot) and isinstance(niv_tot, (int, float)):
-                            talent = talent.strip()
-                            karma = bool(re.search(r' \(D\)$', talent))
-                            talent_key = re.sub(r' \(D\)$', '', talent)
-                            print(f"talent/talent_key/karma: {talent}/{talent_key}/{karma}")
+    def save(self):
+        with open(self.filename, 'w') as f:
+            json.dump(self.data, f)
 
-                            # Vérifier si un talent avec " (D)" existe déjà
-                            if not karma and f"{talent_key} (D)" in talent_cache:
-                                print(f"talent_key: {talent_key} existe déjà avec karma")
-                                continue
+    @staticmethod
+    def get_default_config() -> Dict[str, Any]:
+        return {
+            'default_karma_die': DEFAULT_KARMA_DIE,
+            'max_history_size': MAX_HISTORY_SIZE,
+            'ui_theme': 'default',
+            'window_size': '600x600'
+        }
 
-                            if pd.notna(des) and str(des).strip():
-                                des = des.strip()
-                                # Si le talent est déjà dans le cache, comparer les niveaux totaux
-                                if talent in talent_cache:
-                                    if niv_tot > talent_cache[talent]['niv_tot']:
-                                        talent_cache[talent] = {'niv_tot': niv_tot, 'des': des, 'karma': karma, 'classification': classification}
-                                        print(f"Mis à jour: Talent '{talent}' (Niv. Tot.: {niv_tot}, Dés: {des}, Karma: {karma}, Classification: {classification})")
-                                else:
-                                    talent_cache[talent] = {'niv_tot': niv_tot, 'des': des, 'karma': karma, 'classification': classification}
-                                    print(f"Talent trouvé: '{talent}' (Niv. Tot.: {niv_tot}, Dés: {des}, Karma: {karma}, Classification: {classification})")
-                else:
-                    print(f"Les colonnes nécessaires ne sont pas présentes dans la feuille '{sheet_name}'.")
+class DiceRollerApp:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.config = Config()
+        self.talent_cache = TalentCache()
+        self.roll_history: List[Dict[str, Any]] = []
+        
+        self.setup_window()
+        self.setup_ui()
+        self.add_tooltips()
 
-    # Mettre à jour le champ de typeahead avec la liste des talents
-    update_talent_list(talent_cache)
+    def setup_window(self):
+        self.root.title('Lanceur de dés amélioré')
+        self.root.geometry(self.config.data['window_size'])
 
-    # Créer des boutons permanents pour les talents avec une classification non zéro
-    create_permanent_buttons()
+    def on_return(self, event):
+        self.lancer_des()
 
-# Fonction pour mettre à jour le champ de typeahead à partir du cache des talents
-def update_talent_list(talent_cache):
-    global talent_list
-    talent_list = list(talent_cache.keys())
-    talent_list.sort()  # Classer les talents par ordre alphabétique
-    talent_combo.set_completion_list(talent_list)
+    def setup_ui(self):
+        # Frame principal
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-# Fonction pour lancer des dés en fonction du talent sélectionné dans le champ de typeahead
-def lancer_des():
-    talent = talent_combo.get()
-    if talent in talent_cache:
-        des = talent_cache[talent]['des']
-        karma = talent_cache[talent]['karma']
-        karma_dice = karma_combo.get()
+        # Bouton pour ouvrir un fichier Excel
+        self.open_file_button = ttk.Button(
+            self.main_frame, 
+            text="Ouvrir un fichier Excel", 
+            command=self.load_excel_file
+        )
+        self.open_file_button.pack(pady=10, fill=tk.X)
+
+        # Sélecteur de dé de karma
+        karma_frame = ttk.LabelFrame(self.main_frame, text="Configuration du karma")
+        karma_frame.pack(pady=10, fill=tk.X)
+        
+        self.karma_combo = ttk.Combobox(
+            karma_frame, 
+            values=["D8", "D10", "D12"], 
+            state='readonly'
+        )
+        self.karma_combo.set(self.config.data['default_karma_die'])
+        self.karma_combo.pack(pady=5, padx=5, fill=tk.X)
+
+        # Frame pour les boutons permanents
+        self.permanent_buttons_frame = ttk.LabelFrame(
+            self.main_frame, 
+            text="Talents fréquents"
+        )
+        self.permanent_buttons_frame.pack(pady=10, fill=tk.X)
+
+        # Champ de saisie avec autocomplétion
+        self.talent_combo = AutocompleteCombobox(self.main_frame)
+        self.talent_combo.pack(pady=10, fill=tk.X)
+        self.talent_combo.bind('<Return>', self.on_return)
+
+        # Labels de résultat
+        self.result_frame = ttk.LabelFrame(self.main_frame, text="Résultat")
+        self.result_frame.pack(pady=10, fill=tk.X)
+
+        self.result_label = ttk.Label(
+            self.result_frame, 
+            wraplength=450, 
+            justify='center'
+        )
+        self.result_label.pack(pady=5)
+
+        self.result_value_label = ttk.Label(
+            self.result_frame, 
+            font=('Helvetica', 28), 
+            justify='center'
+        )
+        self.result_value_label.pack(pady=5)
+
+        self.details_label = ttk.Label(
+            self.result_frame, 
+            wraplength=450, 
+            justify='center'
+        )
+        self.details_label.pack(pady=5)
+
+        # Bouton de lancer
+        self.launch_button = ttk.Button(
+            self.main_frame, 
+            text="Lancer les dés", 
+            command=self.lancer_des
+        )
+        self.launch_button.pack(pady=10, fill=tk.X)
+
+        # Historique des lancers
+        self.history_frame = ttk.LabelFrame(
+            self.main_frame, 
+            text="Historique des lancers"
+        )
+
+        self.history_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        # Creation du treeview pour l'historique
+        self.history_tree = ttk.Treeview(
+            self.history_frame,
+            columns=('Talent', 'Résultat', 'Détails', 'Date'),
+            show='headings'
+        )
+        
+        # Configuration des colonnes
+        self.history_tree.heading('Talent', text='Talent')
+        self.history_tree.heading('Résultat', text='Résultat')
+        self.history_tree.heading('Détails', text='Détails')
+        self.history_tree.heading('Date', text='Date')
+        
+        self.history_tree.column('Talent', width=100)
+        self.history_tree.column('Résultat', width=70)
+        self.history_tree.column('Détails', width=200)
+        self.history_tree.column('Date', width=100)
+        
+        # Ajout de la scrollbar
+        history_scrollbar = ttk.Scrollbar(
+            self.history_frame,
+            orient=tk.VERTICAL,
+            command=self.history_tree.yview
+        )
+        self.history_tree.configure(yscrollcommand=history_scrollbar.set)
+        
+        # Placement du treeview et de la scrollbar
+        self.history_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        history_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def add_tooltips(self):
+        tooltips = {
+            self.karma_combo: "Sélectionnez le type de dé de karma à utiliser",
+            self.talent_combo: "Entrez ou sélectionnez un talent",
+            self.launch_button: "Cliquez pour lancer les dés du talent sélectionné",
+            self.open_file_button: "Ouvrir un fichier Excel contenant les talents"
+        }
+        
+        for widget, text in tooltips.items():
+            ToolTip(widget, text)
+
+    def load_excel_file(self):
+        try:
+            file_path = filedialog.askopenfilename(
+                filetypes=(
+                    ("Excel files", "*.xlsx *.xls *.xlsm"),
+                    ("All files", "*.*")
+                )
+            )
+            
+            if not file_path:
+                return
+
+            xls = pd.ExcelFile(file_path)
+            self.talent_cache = TalentCache()  # Reset cache
+
+            for sheet_name, zones in EXCEL_ZONES.items():
+                if sheet_name not in xls.sheet_names:
+                    continue
+
+                for zone in zones:
+                    start, end = zone
+                    df = pd.read_excel(
+                        xls,
+                        sheet_name,
+                        skiprows=start-1,
+                        nrows=end-start+1,
+                        usecols="B:Q"
+                    )
+
+                    # Nettoyer les noms de colonnes
+                    df.columns = [col.strip() if isinstance(col, str) else col 
+                                for col in df.columns]
+
+                    if not all(col in df.columns for col in REQUIRED_COLUMNS):
+                        print(f"Colonnes manquantes dans {sheet_name}")
+                        continue
+
+                    self.process_talent_data(df)
+
+            self.update_talent_list()
+            self.create_permanent_buttons()
+            messagebox.showinfo("Succès", "Fichier Excel chargé avec succès!")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chargement: {str(e)}")
+
+    def process_talent_data(self, df: pd.DataFrame):
+        for _, row in df.iterrows():
+            talent = row['Talents']
+            niv_tot = row['Niv. Tot.']
+            des = row['Dés']
+            classification = row['Classification']
+
+            if not self.validate_talent_data(talent, niv_tot, des, classification):
+                continue
+
+            talent = talent.strip()
+            karma = bool(re.search(r' \(D\)$', talent))
+            talent_key = re.sub(r' \(D\)$', '', talent)
+
+            if not karma and f"{talent_key} (D)" in self.talent_cache.get_all_talents():
+                continue
+
+            if pd.notna(des) and str(des).strip():
+                self.talent_cache.add_talent(
+                    talent,
+                    float(niv_tot),
+                    str(des).strip(),
+                    karma,
+                    classification
+                )
+
+    def validate_talent_data(
+        self,
+        talent: Any,
+        niv_tot: Any,
+        des: Any,
+        classification: Any
+    ) -> bool:
+        if pd.isna(talent) or pd.isna(niv_tot) or not isinstance(niv_tot, (int, float)):
+            return False
+        if pd.isna(des) or not isinstance(des, str):
+            return False
+        if not re.match(r'^(\d*D\d+\s*[\+\-]?\s*)*\d*$', str(des).strip()):
+            return False
+        return True
+
+    def update_talent_list(self):
+        talents = self.talent_cache.get_all_talents()
+        self.talent_combo.set_completion_list(talents)
+
+    def create_permanent_buttons(self):
+        for widget in self.permanent_buttons_frame.winfo_children():
+            widget.destroy()
+
+        talents_with_classification = self.talent_cache.get_classified_talents()
+        talents_with_classification.sort(key=lambda x: (x[1], x[0]))
+
+        columns = {i: [] for i in range(1, 5)}
+        for talent, classification in talents_with_classification:
+            if classification <= 4:
+                columns[classification].append(talent)
+
+        for col in columns.values():
+            col[:] = col[:5]
+
+        for col_num, talents in columns.items():
+            for row_num, talent in enumerate(talents):
+                button = ttk.Button(
+                    self.permanent_buttons_frame,
+                    text=talent,
+                    command=lambda t=talent: self.lancer_des_for_talent(t)
+                )
+                button.grid(row=row_num, column=col_num-1, pady=5, padx=10, sticky=tk.W+tk.E)
+
+    def roll_dice(self, des: str, add_karma: bool = False, karma_dice: Optional[str] = None) -> Tuple[int, str]:
+        def roll_single_die(faces: int) -> Tuple[int, List[str]]:
+            total = 0
+            rolls = []
+            current_roll = random.randint(1, faces)
+            total += current_roll
+            rolls.append(f"{current_roll} (D{faces})")
+            
+            while current_roll == faces:  # Explosion
+                current_roll = random.randint(1, faces)
+                total += current_roll
+                rolls.append(f"EXP {current_roll} (D{faces})")
+                
+            return total, rolls
+
+        total_result = 0
+        all_rolls = []
+        
+        # Parse and roll dice
+        for match in re.finditer(r"(\d*)D(\d+)", des):
+            count = int(match.group(1)) if match.group(1) else 1
+            faces = int(match.group(2))
+            
+            for _ in range(count):
+                result, rolls = roll_single_die(faces)
+                total_result += result
+                all_rolls.extend(rolls)
+
+        # Add any fixed modifiers
+        modifier_match = re.search(r'[\+\-]\s*\d+$', des)
+        if modifier_match:
+            modifier = int(modifier_match.group())
+            total_result += modifier
+            all_rolls.append(str(modifier))
+        
+        # Handle karma dice
+        if add_karma and karma_dice:
+            karma_faces = int(karma_dice[1:])
+            karma_result, karma_rolls = roll_single_die(karma_faces)
+            total_result += karma_result
+            all_rolls.extend([f"+karma: {roll}" for roll in karma_rolls])
+        
+        return total_result, " + ".join(all_rolls)
+
+    def lancer_des(self):
+        talent = self.talent_combo.get()
+        talent_data = self.talent_cache.get_talent(talent)
+        
+        if not talent_data:
+            messagebox.showerror("Erreur", "Talent non trouvé dans le fichier.")
+            return
+
+        des = talent_data['des']
+        karma = talent_data['karma']
+        karma_dice = self.karma_combo.get() if karma else None
 
         if karma:
-            add_karma = messagebox.askyesno("Ajouter un dé de karma", f"Ajouter un dé de karma ({karma_dice}) ?")
+            add_karma = messagebox.askyesno(
+                "Ajouter un dé de karma",
+                f"Ajouter un dé de karma ({karma_dice}) ?"
+            )
         else:
             add_karma = False
 
-        result, details = roll_dice(des, add_karma, karma_dice)
-        result_label.config(text=f'Résultat pour le talent "{talent}" (Niv. Tot. {int(talent_cache[talent]["niv_tot"])}/{des}):')
-        result_value_label.config(text=f'{result}')
-        details_label.config(text=f'Détails: {details}')
-    else:
-        result_label.config(text='Talent non trouvé dans le fichier.')
-        result_value_label.config(text='')
-        details_label.config(text='')
+        result, details = self.roll_dice(des, add_karma, karma_dice)
+        
+        # Mise à jour des labels
+        self.result_label.config(
+            text=f'Résultat pour le talent "{talent}" '
+                 f'(Niv. Tot. {int(talent_data["niv_tot"])}/{des}):'
+        )
+        self.result_value_label.config(text=str(result))
+        self.details_label.config(text=f'Détails: {details}')
+        
+        # Ajout à l'historique
+        from datetime import datetime
+        self.add_to_history(talent, result, details, datetime.now().strftime("%H:%M:%S"))
 
-# Fonction pour lancer le nombre de dés spécifié avec explosion
-def roll_dice(des, add_karma=False, karma_dice=None):
-    # Séparer les dés et les valeurs numériques
-    dice_part = re.findall(r"(\d*D\d+)", des)
-    numeric_part = None
+    def add_to_history(self, talent: str, result: int, details: str):
+            from datetime import datetime
+        
+            # Limiter la taille de l'historique
+            if len(self.roll_history) >= self.config.data['max_history_size']:
+                self.roll_history.pop(0)
+                # Supprimer la première entrée du Treeview
+                first_item = self.history_tree.get_children()[0]
+                self.history_tree.delete(first_item)
+        
+            # Ajouter le nouveau lancer à l'historique
+            current_time = datetime.now().strftime('%H:%M:%S')
+            self.roll_history.append({
+                'talent': talent,
+                'result': result,
+                'details': details,
+                'time': current_time
+            })
+        
+            # Ajouter l'entrée dans le Treeview
+            self.history_tree.insert('', 'end', values=(
+                talent,
+                str(result),
+                details,
+                current_time
+             ))
 
-    # Extraire la partie après le dernier "+"
-    last_plus_index = des.rfind('+')
-    if last_plus_index != -1:
-        last_part = des[last_plus_index + 1:].strip()
-        # Vérifier si la dernière partie contient un "D" ou "d"
-        if 'D' in last_part or 'd' in last_part:
-            numeric_part = None
+    def load_excel_file(self):
+        try:
+                file_path = filedialog.askopenfilename(
+                    filetypes=(
+                        ("Excel files", "*.xlsx *.xls *.xlsm"),
+                        ("All files", "*.*")
+                    )
+                )
+                if not file_path:
+                    return
+
+                xls = pd.ExcelFile(file_path)
+                self.process_excel_file(xls)
+                self.update_talent_list()
+                self.create_permanent_buttons()
+            
+                messagebox.showinfo(
+                    "Succès",
+                    "Le fichier a été chargé avec succès!"
+                )
+            
+        except Exception as e:
+                messagebox.showerror(
+                    "Erreur",
+                    f"Impossible de charger le fichier: {str(e)}"
+                )
+
+    def process_excel_file(self, xls: pd.ExcelFile):
+        for sheet_name, zones in EXCEL_ZONES.items():
+            if sheet_name not in xls.sheet_names:
+                continue
+                
+            for start, end in zones:
+                try:
+                    df = pd.read_excel(
+                        xls,
+                        sheet_name,
+                        skiprows=start-1,
+                        nrows=end-start+1,
+                        usecols="B:Q"
+                    )
+                    
+                    if not all(col in df.columns for col in REQUIRED_COLUMNS):
+                        print(f"Colonnes manquantes dans {sheet_name}")
+                        continue
+                        
+                    self.process_talent_data(df)
+                    
+                except Exception as e:
+                    print(f"Erreur lors du traitement de {sheet_name}: {str(e)}")
+
+    def process_talent_data(self, df: pd.DataFrame):
+        for _, row in df.iterrows():
+            talent = row['Talents']
+            niv_tot = row['Niv. Tot.']
+            des = row['Dés']
+            classification = row['Classification']
+
+            if not self.validate_talent_data(talent, niv_tot, des, classification):
+                continue
+
+            talent = talent.strip()
+            karma = bool(re.search(r' \(D\)$', talent))
+            talent_key = re.sub(r' \(D\)$', '', talent)
+
+            if not karma and f"{talent_key} (D)" in self.talent_cache._cache:
+                continue
+
+            if pd.notna(des) and str(des).strip():
+                des = des.strip()
+                self.talent_cache.add_talent(
+                    talent,
+                    float(niv_tot),
+                    des,
+                    karma,
+                    classification
+                )
+
+    def validate_talent_data(self, talent, niv_tot, des, classification) -> bool:
+        if not pd.notna(talent) or not isinstance(talent, str):
+            return False
+        if not pd.notna(niv_tot) or not isinstance(niv_tot, (int, float)):
+            return False
+        if not pd.notna(des) or not isinstance(des, str):
+            return False
+        if not re.match(r'^(\d*D\d+\s*[\+\-]?\s*)*\d*$', des.strip()):
+            return False
+        return True
+
+    def update_talent_list(self):
+        self.talent_combo.set_completion_list(self.talent_cache.get_all_talents())
+
+    def create_permanent_buttons(self):
+        # Nettoyer les boutons existants
+        for widget in self.permanent_buttons_frame.winfo_children():
+            widget.destroy()
+
+        # Récupérer et trier les talents classifiés
+        talents_with_classification = self.talent_cache.get_classified_talents()
+        talents_with_classification.sort(key=lambda x: (-x[1], x[0]))
+
+        # Créer les colonnes de boutons
+        columns = {i: [] for i in range(1, 5)}
+        for talent, classification in talents_with_classification:
+            if classification <= 4:
+                columns[int(classification)].append(talent)
+
+        # Limiter à 5 boutons par colonne
+        for col in columns.values():
+            col[:] = col[:5]
+
+        # Créer les boutons
+        for col_num, talents in columns.items():
+            for row_num, talent in enumerate(talents):
+                button = ttk.Button(
+                    self.permanent_buttons_frame,
+                    text=talent,
+                    command=lambda t=talent: self.lancer_des_for_talent(t)
+                )
+                button.grid(
+                    row=row_num,
+                    column=col_num-1,
+                    pady=5,
+                    padx=10,
+                    sticky=tk.W+tk.E
+                )
+
+    def lancer_des_for_talent(self, talent: str):
+        self.talent_combo.set(talent)
+        self.lancer_des()
+
+    def lancer_des(self):
+        talent = self.talent_combo.get()
+        talent_data = self.talent_cache.get_talent(talent)
+        
+        if not talent_data:
+            self.update_result_labels(
+                "Talent non trouvé dans le fichier.",
+                "",
+                ""
+            )
+            return
+
+        karma = talent_data['karma']
+        karma_dice = self.karma_combo.get() if karma else None
+
+        if karma:
+            add_karma = messagebox.askyesno(
+                "Ajouter un dé de karma",
+                f"Ajouter un dé de karma ({karma_dice}) ?"
+            )
         else:
-            # Vérifier si la dernière partie est un nombre
-            if last_part.isdigit():
-                numeric_part = last_part
+            add_karma = False
 
-    result = 0
-    details = []
+        result, details = self.roll_dice(
+            talent_data['des'],
+            add_karma,
+            karma_dice
+        )
 
-    # Traiter les dés
-    for dice in dice_part:
-        rolls = re.findall(r"(\d*)D(\d+)", dice)
-        for roll in rolls:
-            num_dice = int(roll[0]) if roll[0] else 1
-            faces = int(roll[1])
-            for _ in range(num_dice):
-                roll_result = random.randint(1, faces)
-                result += roll_result
-                details.append(f"{roll_result} (D{faces})")
-                while roll_result == faces:
-                    roll_result = random.randint(1, faces)
-                    result += roll_result
-                    details.append(f"EXP {roll_result} (D{faces})")
+        self.update_result_labels(
+            f'Résultat pour le talent "{talent}" '
+            f'(Niv. Tot. {int(talent_data["niv_tot"])}/{talent_data["des"]}):',
+            str(result),
+            f'Détails: {details}'
+        )
+        
+        self.add_to_history(talent, result, details)
 
-    # Ajouter les valeurs numériques à la fin
-    if numeric_part:
-        result += int(numeric_part)
-        details.append(f"{numeric_part}")
+    def update_result_labels(self, result_text: str, value_text: str, details_text: str):
+        self.result_label.config(text=result_text)
+        self.result_value_label.config(text=value_text)
+        self.details_label.config(text=details_text)
 
-    # Ajouter le dé de karma si nécessaire
-    if add_karma and karma_dice:
-        karma_faces = int(karma_dice[1:])
-        karma_result = random.randint(1, karma_faces)
-        result += karma_result
-        details.append(f"+karma ({karma_dice}): {karma_result}")
-        while karma_result == karma_faces:
-            karma_result = random.randint(1, karma_faces)
-            result += karma_result
-            details.append(f"EXP {karma_result} (D{karma_faces})")
+    def roll_dice(self, des: str, add_karma: bool = False, karma_dice: Optional[str] = None) -> Tuple[int, str]:
+        def roll_single_die(faces: int) -> Tuple[int, List[str]]:
+            total = 0
+            rolls = []
+            current_roll = random.randint(1, faces)
+            total += current_roll
+            rolls.append(f"{current_roll} (D{faces})")
+            
+            while current_roll == faces:  # Explosion
+                current_roll = random.randint(1, faces)
+                total += current_roll
+                rolls.append(f"EXP {current_roll} (D{faces})")
+                
+            return total, rolls
 
-    return result, " + ".join(details)
+        total_result = 0
+        all_rolls = []
+        
+        # Traiter les dés standards
+        for match in re.finditer(r"(\d*)D(\d+)", des):
+            count = int(match.group(1)) if match.group(1) else 1
+            faces = int(match.group(2))
+            
+            for _ in range(count):
+                result, rolls = roll_single_die(faces)
+                total_result += result
+                all_rolls.extend(rolls)
+        
+        # Traiter le bonus numérique
+        bonus_match = re.search(r'\+\s*(\d+)$', des)
+        if bonus_match:
+            bonus = int(bonus_match.group(1))
+            total_result += bonus
+            all_rolls.append(str(bonus))
+        
+        # Traiter le dé de karma
+        if add_karma and karma_dice:
+            karma_faces = int(karma_dice[1:])
+            karma_result, karma_rolls = roll_single_die(karma_faces)
+            total_result += karma_result
+            all_rolls.extend([f"+karma: {roll}" for roll in karma_rolls])
+        
+        return total_result, " + ".join(all_rolls)
 
-# Fonction pour lancer les dés lorsque la touche [Return] est pressée
-def on_return(event):
-    lancer_des()
+    def on_return(self, event):
+        self.lancer_des()
 
-# Fonction pour créer des boutons permanents pour les talents avec une classification non zéro
-def create_permanent_buttons():
-    # Supprimer les anciens boutons permanents s'ils existent
-    for widget in permanent_buttons_frame.winfo_children():
-        widget.destroy()
+    def run(self):
+        self.root.mainloop()
 
-    # Créer des boutons permanents pour les talents avec une classification non zéro
-    talents_with_classification = [(talent, data['classification']) for talent, data in talent_cache.items() if isinstance(data['classification'], (int, float)) and data['classification'] > 0]
-    talents_with_classification.sort(key=lambda x: (x[1], x[0]))  # Trier par classification puis par ordre alphabétique
-
-    # Organiser les talents en colonnes
-    columns = {i: [] for i in range(1, 5)}
-    for talent, classification in talents_with_classification:
-        if classification <= 4:
-            columns[classification].append(talent)
-
-    # Limiter à 5 boutons par colonne
-    for col in columns.values():
-        col[:] = col[:5]
-
-    # Créer les boutons
-    for col_num, talents in columns.items():
-        for row_num, talent in enumerate(talents):
-            button = ttk.Button(permanent_buttons_frame, text=talent, command=lambda t=talent: lancer_des_for_talent(t))
-            button.grid(row=row_num, column=col_num-1, pady=5, padx=10, sticky=tk.W+tk.E)
-
-# Fonction pour lancer les dés pour un talent spécifique
-def lancer_des_for_talent(talent):
-    talent_combo.set(talent)
-    lancer_des()
-
-# Initialiser l’application
-root = tk.Tk()
-root.title('Lancer de dés')
-root.geometry("600x600")
-
-# Créer un bouton ouvrir un fichier excel
-open_file_button = ttk.Button(root, text="Ouvrir un fichier Excel", command=load_excel_file)
-open_file_button.pack(pady=10, padx=20, fill=tk.X)
-
-# Créer un sélecteur de dé de karma
-karma_label = ttk.Label(root, text="Sélecteur de dé de karma:")
-karma_label.pack(pady=5, padx=20)
-karma_combo = ttk.Combobox(root, values=["D8", "D10", "D12"], state='readonly')
-karma_combo.current(0)
-karma_combo.pack(pady=5, padx=20)
-
-# Créer un cadre pour les boutons permanents
-permanent_buttons_frame = ttk.Frame(root)
-permanent_buttons_frame.pack(pady=10, padx=20, fill=tk.X)
-
-# Créer un champ de saisie avec typeahead pour sélectionner une compétence
-talent_combo = AutocompleteCombobox(root, state='normal')
-talent_combo.pack(pady=10, fill=tk.X, padx=20)
-talent_combo.bind('<Return>', on_return)
-
-# Créer un label pour le message de résultat
-result_label = ttk.Label(root, wraplength=450, justify='center')
-result_label.pack(pady=20, padx=20)
-
-# Créer un label pour afficher le résultat principal en grand
-result_value_label = ttk.Label(root, font=('Helvetica', 28), justify='center')
-result_value_label.pack(pady=10, padx=20)
-
-# Créer un label pour afficher les détails
-details_label = ttk.Label(root, wraplength=450, justify='center')
-details_label.pack(pady=20, padx=20)
-
-# Créer un bouton lancer les dés
-launch_button = ttk.Button(root, text="Lancer les dés", command=lancer_des)
-launch_button.pack(pady=10, padx=20, fill=tk.X)
-
-# Initialiser le cache des compétences vide
-talent_cache = {}
-talent_list = []
-
-# Lancer l’application
-root.mainloop()
+if __name__ == "__main__":
+    app = DiceRollerApp()
+    app.run()
