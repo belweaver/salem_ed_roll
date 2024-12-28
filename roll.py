@@ -256,7 +256,7 @@ class DiceRollerApp:
         # Creation du treeview pour l'historique
         self.history_tree = ttk.Treeview(
             self.history_frame,
-            columns=('Talent', 'Résultat', 'Détails', 'Date'),
+            columns=('Talent', 'Résultat', 'Détails', 'Heure'),
             show='headings'
         )
         
@@ -264,12 +264,12 @@ class DiceRollerApp:
         self.history_tree.heading('Talent', text='Talent')
         self.history_tree.heading('Résultat', text='Résultat')
         self.history_tree.heading('Détails', text='Détails')
-        self.history_tree.heading('Date', text='Date')
+        self.history_tree.heading('Heure', text='Heure')
         
-        self.history_tree.column('Talent', width=100)
-        self.history_tree.column('Résultat', width=70)
-        self.history_tree.column('Détails', width=200)
-        self.history_tree.column('Date', width=100)
+        self.history_tree.column('Talent', width=150)
+        self.history_tree.column('Résultat', width=50)
+        self.history_tree.column('Détails', width=250)
+        self.history_tree.column('Heure', width=50)
         
         # Ajout de la scrollbar
         history_scrollbar = ttk.Scrollbar(
@@ -449,7 +449,7 @@ class DiceRollerApp:
             karma_faces = int(karma_dice[1:])
             karma_result, karma_rolls = roll_single_die(karma_faces)
             total_result += karma_result
-            all_rolls.extend([f"+karma: {roll}" for roll in karma_rolls])
+            all_rolls.extend([f"KARMA {roll}" for roll in karma_rolls])
         
         return total_result, " + ".join(all_rolls)
 
