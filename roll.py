@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Optional, Any
 
 # Constants
 EXCEL_ZONES = {
-    "Comp": [(4, 20), (35, 43), (52, 55)],
+    "Comp": [(4, 20), (35, 43), (51, 55)],
     "D1": [(5, 49)],
     "D2": [(5, 49)],
     "D3": [(5, 49)],
