@@ -156,7 +156,10 @@ class Config:
             'default_karma_die': DEFAULT_KARMA_DIE,
             'max_history_size': MAX_HISTORY_SIZE,
             'ui_theme': UI_THEME,
-            'window_size': WINDOW_SIZE
+            'window_size': WINDOW_SIZE,
+            'excel_zones': EXCEL_ZONES,
+            'substitute_talent_column_name': SUBSTITUTE_TALENT_COLUMN_NAME,
+            'required_columns': REQUIRED_COLUMNS
         }
 
 class DiceRollerApp:
@@ -708,7 +711,7 @@ class DiceRollerApp:
     def update_result_labels(self, result_text: str, value_text: str, details_text: str):
         self.result_label.config(text=result_text)
         self.result_value_label.config(text=value_text)
-        self.details_label.config(text=details_text)
+        self.details_label.config(text(details_text))
 
     def roll_dice(self, des: str, add_karma: bool = False, karma_dice: Optional[str] = None) -> Tuple[int, str]:
         def roll_single_die(faces: int) -> Tuple[int, List[str]]:
