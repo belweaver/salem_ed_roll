@@ -17,6 +17,7 @@ EXCEL_ZONES = {
     "Passions+autres": [(4, 46), (82, 85), (90, 105), (106, 112)]
 }
 
+SUBSTITUTE_TALENT_COLUMN_NAME = ['Connaissances', 'Compétences', 'Art / artisanat']
 REQUIRED_COLUMNS = ['Talents', 'Niv. Tot.', 'Dés', 'Classification']
 DEFAULT_KARMA_DIE = 'D12'
 MAX_HISTORY_SIZE = 50
@@ -323,7 +324,7 @@ class DiceRollerApp:
                     )
 
                     # Nettoyer les noms de colonnes
-                    df.columns = [col.strip() if isinstance(col, str) else col 
+                    df.columns = ['Talents' if col.strip() in SUBSTITUTE_TALENT_COLUMN_NAME else col.strip() if isinstance(col, str) else col 
                                 for col in df.columns]
 
                     if not all(col in df.columns for col in REQUIRED_COLUMNS):
