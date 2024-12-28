@@ -7,3 +7,4 @@ build/
 .salem_ed_roll/
 roll.spec
 .vscode/
+.venv/
