@@ -181,12 +181,31 @@ class DiceRollerApp:
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Bouton pour ouvrir un fichier Excel
+        file_frame = ttk.Frame(self.main_frame)
+        file_frame.pack(pady=10, fill=tk.X)
+
         self.open_file_button = ttk.Button(
-            self.main_frame, 
-            text="Ouvrir un fichier Excel", 
+            file_frame,
+            text="Ouvrir un fichier Excel",
             command=self.load_excel_file
         )
-        self.open_file_button.pack(pady=10, fill=tk.X)
+        self.open_file_button.pack(side=tk.LEFT, padx=(0, 5))
+
+        # Bouton pour sauvegarder la configuration
+        self.save_config_button = ttk.Button(
+            file_frame,
+            text="Sauvegarder Config",
+            command=self.save_config
+        )
+        self.save_config_button.pack(side=tk.LEFT, padx=(5, 5))
+
+        # Bouton pour recharger la configuration
+        self.reload_config_button = ttk.Button(
+            file_frame,
+            text="Recharger Config",
+            command=self.reload_config
+        )
+        self.reload_config_button.pack(side=tk.LEFT, padx=(5, 0))
 
         # Sélecteur de dé de karma
         karma_frame = ttk.LabelFrame(self.main_frame, text="Configuration du karma")
@@ -287,7 +306,8 @@ class DiceRollerApp:
         tooltips = {
             self.karma_combo: "Sélectionnez le type de dé de karma à utiliser",
             self.talent_combo: "Entrez ou sélectionnez un talent",
-            self.launch_button: "Cliquez pour lancer les dés du talent sélectionné",
+            self.launch_button: "Cliquez pour lancer les dés du talent sélectionné",            
+            self.save_config_button: "Sauvegarder la configuration actuelle",
             self.open_file_button: "Ouvrir un fichier Excel contenant les talents"
         }
         
@@ -734,6 +754,14 @@ class DiceRollerApp:
 
     def on_return(self, event):
         self.lancer_des()
+
+    def save_config(self):
+        self.config.save()
+        messagebox.showinfo("Succès", "Configuration sauvegardée avec succès!")
+
+    def reload_config(self):
+        self.config = Config()
+        messagebox.showinfo("Succès", "Configuration rechargée avec succès!")
 
     def run(self):
         self.root.mainloop()
