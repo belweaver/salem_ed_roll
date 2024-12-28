@@ -21,6 +21,8 @@ SUBSTITUTE_TALENT_COLUMN_NAME = ['Connaissances', 'Compétences', 'Art / artisan
 REQUIRED_COLUMNS = ['Talents', 'Niv. Tot.', 'Dés', 'Classification']
 DEFAULT_KARMA_DIE = 'D12'
 MAX_HISTORY_SIZE = 50
+WINDOW_SIZE = '600x800'
+UI_THEME = 'default'
 
 class ToolTip:
     def __init__(self, widget: tk.Widget, text: str):
@@ -153,8 +155,8 @@ class Config:
         return {
             'default_karma_die': DEFAULT_KARMA_DIE,
             'max_history_size': MAX_HISTORY_SIZE,
-            'ui_theme': 'default',
-            'window_size': '600x800'
+            'ui_theme': UI_THEME,
+            'window_size': WINDOW_SIZE
         }
 
 class DiceRollerApp:
