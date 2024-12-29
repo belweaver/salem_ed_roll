@@ -11,7 +11,7 @@ Lancer les dés Earthdawn à partir de la feuille Excel de Salem
     - CH
     - Comp
     - Passions+autres
-- ajoute les talents qui se trouvent dans le fichier dice_roller_config.json
+- ajouter les talents qui se trouvent dans le fichier dice_roller_config.json
 - ajouter des boutons rapides pour lancer les talents essentiels (ceux avec une valeur dans la colonne "Classification")
 - ajouter un champ de saisie semi-automatique avec tous les talents trouvés dans le fichier Excel
 - lancer des dés avec le mécanisme "d'explosion"
