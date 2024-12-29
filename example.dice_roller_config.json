@@ -1,0 +1,16 @@
+{
+	"default_karma_die": "D12",
+	"max_history_size": 50,
+	"ui_theme": "default",
+	"window_size": "600x800",
+	"excel_zones": {
+		"Comp": [[4, 20], [35, 43], [51, 55]],
+		"D1": [[5, 49]],
+		"D2": [[5, 49]],
+		"D3": [[5, 49]],
+		"CH": [[5, 48]],
+		"Passions+autres": [[4, 46], [82, 85], [90, 105], [106, 112]]
+    },
+	"substitute_talent_column_name": ["Connaissances", "Compétences", "Art / artisanat"],
+    "required_columns": ["Talents", "Niv. Tot.", "Dés", "Classification"]
+	}

@@ -141,14 +141,17 @@ class Config:
 
     def load(self) -> Dict[str, Any]:
         try:
-            with open(self.filename, 'r') as f:
-                return json.load(f)
+            with open(self.filename, 'r', encoding= 'utf-8') as f:
+                config = json.load(f)
+                default_config = self.get_default_config()
+                default_config.update(config)
+                return default_config
         except FileNotFoundError:
             return self.get_default_config()
 
     def save(self):
-        with open(self.filename, 'w') as f:
-            json.dump(self.data, f)
+        with open(self.filename, 'w', encoding= 'utf-8') as f:
+            json.dump(self.data, f, indent=4, ensure_ascii=False)
 
     @staticmethod
     def get_default_config() -> Dict[str, Any]:
@@ -194,23 +197,23 @@ class DiceRollerApp:
             text="Ouvrir un fichier Excel",
             command=self.load_excel_file
         )
-        self.open_file_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.open_file_button.pack(side=tk.TOP, pady=10)
 
         # Bouton pour sauvegarder la configuration
-        self.save_config_button = ttk.Button(
-            file_frame,
-            text="Sauvegarder Config",
-            command=self.save_config
-        )
-        self.save_config_button.pack(side=tk.LEFT, padx=(5, 5))
+        #self.save_config_button = ttk.Button(
+        #    file_frame,
+        #    text="Sauvegarder Config",
+        #    command=self.save_config
+        #)
+        #self.save_config_button.pack(side=tk.LEFT, padx=(5, 5))
 
         # Bouton pour recharger la configuration
-        self.reload_config_button = ttk.Button(
-            file_frame,
-            text="Recharger Config",
-            command=self.reload_config
-        )
-        self.reload_config_button.pack(side=tk.LEFT, padx=(5, 0))
+        #self.reload_config_button = ttk.Button(
+        #    file_frame,
+        #    text="Recharger Config",
+        #    command=self.reload_config
+        #)
+        #self.reload_config_button.pack(side=tk.LEFT, padx=(5, 0))
 
         # Sélecteur de dé de karma
         karma_frame = ttk.LabelFrame(self.main_frame, text="Configuration du karma")
@@ -312,7 +315,7 @@ class DiceRollerApp:
             self.karma_combo: "Sélectionnez le type de dé de karma à utiliser",
             self.talent_combo: "Entrez ou sélectionnez un talent",
             self.launch_button: "Cliquez pour lancer les dés du talent sélectionné",            
-            self.save_config_button: "Sauvegarder la configuration actuelle",
+            #self.save_config_button: "Sauvegarder la configuration actuelle",
             self.open_file_button: "Ouvrir un fichier Excel contenant les talents"
         }
         
@@ -334,7 +337,7 @@ class DiceRollerApp:
             xls = pd.ExcelFile(file_path)
             self.talent_cache = TalentCache()  # Reset cache
 
-            for sheet_name, zones in EXCEL_ZONES.items():
+            for sheet_name, zones in self.config.data['excel_zones'].items():
                 if sheet_name not in xls.sheet_names:
                     continue
 
@@ -349,10 +352,13 @@ class DiceRollerApp:
                     )
 
                     # Nettoyer les noms de colonnes
-                    df.columns = ['Talents' if col.strip() in SUBSTITUTE_TALENT_COLUMN_NAME else col.strip() if isinstance(col, str) else col 
-                                for col in df.columns]
+                    df.columns = [
+                        'Talents' if isinstance(col, str) and col.strip() in self.config.data['substitute_talent_column_name'] else col.strip() if isinstance(col, str) else col 
+                        for col in df.columns
+                    ]
 
-                    if not all(col in df.columns for col in REQUIRED_COLUMNS):
+                    if not all(col in df.columns for col in self.config.data['required_columns']):
+#                    if not all(col in df.columns for col in REQUIRED_COLUMNS):
                         print(f"Colonnes manquantes dans {sheet_name}")
                         continue
 
@@ -539,33 +545,6 @@ class DiceRollerApp:
                 current_time
              ))
 
-    def load_excel_file(self):
-        try:
-                file_path = filedialog.askopenfilename(
-                    filetypes=(
-                        ("Excel files", "*.xlsx *.xls *.xlsm"),
-                        ("All files", "*.*")
-                    )
-                )
-                if not file_path:
-                    return
-
-                xls = pd.ExcelFile(file_path)
-                self.process_excel_file(xls)
-                self.update_talent_list()
-                self.create_permanent_buttons()
-            
-                messagebox.showinfo(
-                    "Succès",
-                    "Le fichier a été chargé avec succès!"
-                )
-            
-        except Exception as e:
-                messagebox.showerror(
-                    "Erreur",
-                    f"Impossible de charger le fichier: {str(e)}"
-                )
-
     def process_excel_file(self, xls: pd.ExcelFile):
         for sheet_name, zones in EXCEL_ZONES.items():
             if sheet_name not in xls.sheet_names:
@@ -581,7 +560,7 @@ class DiceRollerApp:
                         usecols="B:Q"
                     )
                     
-                    if not all(col in df.columns for col in REQUIRED_COLUMNS):
+                    if not all(col in df.columns for col in self.config.data['required_columns']):
                         print(f"Colonnes manquantes dans {sheet_name}")
                         continue
                         
@@ -711,7 +690,7 @@ class DiceRollerApp:
     def update_result_labels(self, result_text: str, value_text: str, details_text: str):
         self.result_label.config(text=result_text)
         self.result_value_label.config(text=value_text)
-        self.details_label.config(text(details_text))
+        self.details_label.config(text=details_text)
 
     def roll_dice(self, des: str, add_karma: bool = False, karma_dice: Optional[str] = None) -> Tuple[int, str]:
         def roll_single_die(faces: int) -> Tuple[int, List[str]]:
