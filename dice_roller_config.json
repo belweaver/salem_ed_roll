@@ -13,7 +13,7 @@
     },
 	"substitute_talent_column_name": ["Connaissances", "Compétences", "Art / artisanat"],
     "required_columns": ["Talents", "Niv. Tot.", "Dés", "Classification"],
-    "damage buttons": {
+    "damage_buttons": {
         "Attaque 1": {
             "Talents": "Attaque 1 (D)",
             "Niv. Tot.": "20",

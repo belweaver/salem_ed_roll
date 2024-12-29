@@ -371,32 +371,6 @@ class DiceRollerApp:
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement: {str(e)}")
 
-    def process_talent_data(self, df: pd.DataFrame):
-        for _, row in df.iterrows():
-            talent = row['Talents']
-            niv_tot = row['Niv. Tot.']
-            des = row['Dés']
-            classification = row['Classification']
-
-            if not self.validate_talent_data(talent, niv_tot, des, classification):
-                continue
-
-            talent = talent.strip()
-            karma = bool(re.search(r' \(D\)$', talent))
-            talent_key = re.sub(r' \(D\)$', '', talent)
-
-            if not karma and f"{talent_key} (D)" in self.talent_cache.get_all_talents():
-                continue
-
-            if pd.notna(des) and str(des).strip():
-                self.talent_cache.add_talent(
-                    talent,
-                    float(niv_tot),
-                    str(des).strip(),
-                    karma,
-                    classification
-                )
-
     def validate_talent_data(
         self,
         talent: Any,
@@ -416,7 +390,7 @@ class DiceRollerApp:
         talents = self.talent_cache.get_all_talents()
         self.talent_combo.set_completion_list(talents)
 
-    def create_permanent_buttons(self):
+    def create_permanent_buttons(self):  #sans doute jamais utilisé
         for widget in self.permanent_buttons_frame.winfo_children():
             widget.destroy()
 
@@ -425,6 +399,7 @@ class DiceRollerApp:
 
         columns = {i: [] for i in range(1, 5)}
         for talent, classification in talents_with_classification:
+            print(talent, " : ", classification)
             if classification <= 4:
                 columns[classification].append(talent)
 
@@ -545,30 +520,6 @@ class DiceRollerApp:
                 current_time
              ))
 
-    def process_excel_file(self, xls: pd.ExcelFile):
-        for sheet_name, zones in EXCEL_ZONES.items():
-            if sheet_name not in xls.sheet_names:
-                continue
-                
-            for start, end in zones:
-                try:
-                    df = pd.read_excel(
-                        xls,
-                        sheet_name,
-                        skiprows=start-1,
-                        nrows=end-start+1,
-                        usecols="B:Q"
-                    )
-                    
-                    if not all(col in df.columns for col in self.config.data['required_columns']):
-                        print(f"Colonnes manquantes dans {sheet_name}")
-                        continue
-                        
-                    self.process_talent_data(df)
-                    
-                except Exception as e:
-                    print(f"Erreur lors du traitement de {sheet_name}: {str(e)}")
-
     def process_talent_data(self, df: pd.DataFrame):
         for _, row in df.iterrows():
             talent = row['Talents']
@@ -588,12 +539,37 @@ class DiceRollerApp:
 
             if pd.notna(des) and str(des).strip():
                 des = des.strip()
+                if classification > 0:
+                    print("adding regular talent")
+                    print(talent)
+                    print(float(niv_tot))
+                    print(des)
+                    print(karma)
+                    print(classification)
                 self.talent_cache.add_talent(
                     talent,
                     float(niv_tot),
                     des,
                     karma,
                     classification
+                )
+
+        # Add damage buttons from config
+        if 'damage_buttons' in self.config.data:
+            print("Adding damage buttons")
+            for button_name, button_data in self.config.data['damage_buttons'].items():
+                print(f"Adding button: {button_name}")
+                print(button_data['Talents'])
+                print(float(button_data['Niv. Tot.']))
+                print(button_data['Dés'])
+                print(bool(re.search(r' \(D\)$', button_data['Talents'])))
+                print(float(button_data['Classification']))
+                self.talent_cache.add_talent(
+                    button_data['Talents'],
+                    float(button_data['Niv. Tot.']),
+                    button_data['Dés'],
+                    bool(re.search(r' \(D\)$', button_data['Talents'])),
+                    float(button_data['Classification'])
                 )
 
     def validate_talent_data(self, talent, niv_tot, des, classification) -> bool:
@@ -611,6 +587,7 @@ class DiceRollerApp:
         self.talent_combo.set_completion_list(self.talent_cache.get_all_talents())
 
     def create_permanent_buttons(self):
+        print("Creating permanent buttons")
         # Nettoyer les boutons existants
         for widget in self.permanent_buttons_frame.winfo_children():
             widget.destroy()
@@ -622,6 +599,7 @@ class DiceRollerApp:
         # Créer les colonnes de boutons
         columns = {i: [] for i in range(1, 5)}
         for talent, classification in talents_with_classification:
+            print(talent, " : ", classification)
             if classification <= 4:
                 columns[int(classification)].append(talent)
 
