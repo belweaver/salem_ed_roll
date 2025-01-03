@@ -368,6 +368,9 @@ class DiceRollerApp:
             self.create_permanent_buttons()
             messagebox.showinfo("Succès", "Fichier Excel chargé avec succès!")
             
+            # Close the Excel file
+            xls.close()
+
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors du chargement: {str(e)}")
 
