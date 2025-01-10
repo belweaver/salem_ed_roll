@@ -15,15 +15,33 @@
     "required_columns": ["Talents", "Niv. Tot.", "Dés", "Classification"],
     "damage_buttons": {
         "Attaque 1": {
-            "Talents": "Attaque 1 (D)",
-            "Niv. Tot.": "20",
-            "Dés" : "D20+D8+4",
+            "Talents": "Epée 2M (D)",
+            "Niv. Tot.": "27",
+            "Dés" : "D20+D10+2D8+d12+3",
             "Classification": "4"
         },
         "Attaque 2": {
-            "Talents": "Attaque 2",
-            "Niv. Tot.": "25",
-            "Dés" : "D20+D8+8",
+            "Talents": "Epée 2M + grenfl (D)",
+            "Niv. Tot.": "27",
+            "Dés" : "D20+D10+2D8+d12+13",
+            "Classification": "4"
+        },
+        "Attaque 3": {
+            "Talents": "Epée 2M + surpr (D)",
+            "Niv. Tot.": "27",
+            "Dés" : "D20+D10+2D8+d12+13",
+            "Classification": "4"
+        },
+        "Attaque 4": {
+            "Talents": "Epée 2M + grenfl + surpr (D)",
+            "Niv. Tot.": "27",
+            "Dés" : "D20+D10+2D8+d12+23",
+            "Classification": "4"
+        },
+        "Attaque 5": {
+            "Talents": "Coup de pommeau (D)",
+            "Niv. Tot.": "27",
+            "Dés" : "D20+D8+D6",
             "Classification": "4"
         }
     }
